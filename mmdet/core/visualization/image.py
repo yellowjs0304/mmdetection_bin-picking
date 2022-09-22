@@ -13,6 +13,7 @@ from mmdet.core.evaluation.panoptic_utils import INSTANCE_OFFSET
 from ..mask.structures import bitmap_to_polygon
 from ..utils import mask2ndarray
 from .palette import get_palette, palette_val
+import random
 
 __all__ = [
     'color_val_matplotlib', 'draw_masks', 'draw_bboxes', 'draw_labels',
@@ -100,6 +101,7 @@ def draw_bboxes(ax, bboxes, color='g', alpha=0.8, thickness=2):
                 [bbox_int[2], bbox_int[3]], [bbox_int[2], bbox_int[1]]]
         np_poly = np.array(poly).reshape((4, 2))
         polygons.append(Polygon(np_poly))
+        
     p = PatchCollection(
         polygons,
         facecolor='none',
@@ -197,9 +199,14 @@ def draw_masks(ax, img, masks, color=None, with_edge=True, alpha=0.8):
 
         mask = mask.astype(bool)
         img[mask] = img[mask] * (1 - alpha) + color_mask * alpha
+    
+    if img.shape[0] >3000 or img.shape[1]>3000:
+        line_widths = 5
+    else:
+        line_widths = 2
 
     p = PatchCollection(
-        polygons, facecolor='none', edgecolors='w', linewidths=1, alpha=0.8)
+        polygons, facecolor='none', edgecolors='w', linewidths=line_widths, alpha=0.8)
     ax.add_collection(p)
 
     return ax, img
@@ -298,9 +305,26 @@ def imshow_det_bboxes(img,
 
     num_bboxes = 0
     if bboxes is not None:
+        # original
         num_bboxes = bboxes.shape[0]
+        bbox_color = "red"
         bbox_palette = palette_val(get_palette(bbox_color, max_label + 1))
         colors = [bbox_palette[label] for label in labels[:num_bboxes]]
+
+        # Random Color - Jisu
+        # num_bboxes = bboxes.shape[0]
+        # if bbox_color == "one_class_random":
+        #     bbox_palette = get_palette(bbox_color, max_label + 1)
+        #     colors = [random.choice(bbox_palette) for label in labels[:num_bboxes]]
+        # else:
+        #     bbox_palette = palette_val(get_palette(bbox_color, max_label + 1))
+        #     colors = [bbox_palette[label] for label in labels[:num_bboxes]]
+        # print(colors)
+        # import pdb; pdb.set_trace()
+        img_size = img.shape
+        if img_size[0] >3000 or img_size[1]>3000:
+            thickness = 10
+
         draw_bboxes(ax, bboxes, colors, alpha=0.8, thickness=thickness)
 
         horizontal_alignment = 'left'
@@ -321,9 +345,16 @@ def imshow_det_bboxes(img,
 
     if segms is not None:
         mask_palette = get_palette(mask_color, max_label + 1)
-        colors = [mask_palette[label] for label in labels]
+        bbox_color = "one_class_random"
+        if bbox_color == "one_class_random":
+            colors = [random.choice(mask_palette) for label in labels[:num_bboxes]]
+            # colors = colors
+        else:
+            colors = [mask_palette[label] for label in labels]
         colors = np.array(colors, dtype=np.uint8)
-        draw_masks(ax, img, segms, colors, with_edge=True)
+
+        # One Class인데 color를 다양하게 하고 싶을 때
+        draw_masks(ax, img, segms, colors, with_edge=True, alpha = 0.5)
 
         if num_bboxes < segms.shape[0]:
             segms = segms[num_bboxes:]
@@ -338,6 +369,7 @@ def imshow_det_bboxes(img,
                 areas.append(stats[largest_id, -1])
             areas = np.stack(areas, axis=0)
             scales = _get_adaptive_scales(areas)
+            
             draw_labels(
                 ax,
                 labels[num_bboxes:],
